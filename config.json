@@ -1,0 +1,28 @@
+{
+  "indices": [
+    "NIFTY AUTO",
+    "NIFTY BANK",
+    "NIFTY FINANCIAL SERVICES",
+    "NIFTY FMCG",
+    "NIFTY IT",
+    "NIFTY MEDIA",
+    "NIFTY METAL",
+    "NIFTY PHARMA",
+    "NIFTY PSU BANK",
+    "NIFTY REALTY",
+    "NIFTY PRIVATE BANK",
+    "NIFTY HEALTHCARE INDEX",
+    "NIFTY CONSUMER DURABLES",
+    "NIFTY OIL & GAS",
+    "NIFTY FINANCIAL SERVICES EX-BANK",
+    "NIFTY MIDSMALL HEALTHCARE",
+    "NIFTY MIDSMALL IT & TELECOM",
+    "NIFTY CHEMICALS",
+    "NIFTY500 HEALTHCARE",
+    "NIFTY REITS & REALTY"
+  ],
+  "ath_min_history_years": 5,
+  "near_ath_max_distance_pct": 10.0,
+  "minimum_momentum_score": 80,
+  "report_timezone": "Asia/Kolkata"
+}

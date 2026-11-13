@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101827"><title>Nifty Momentum Monitor</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121d2e;--line:#25344a;--muted:#9aabc1;--text:#edf3fb;--green:#3ddc97;--amber:#f3c969}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif}
+main{max-width:1100px;margin:auto;padding:22px 16px 50px}header{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+h1{font-size:24px;margin:4px 0}p,.muted{color:var(--muted)}.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin:16px 0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:#0d1727;padding:12px;border-radius:10px}.stat b{display:block;font-size:22px;margin-top:5px}
+.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:850px}th,td{text-align:right;padding:12px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-size:12px;text-transform:uppercase}
+.score{color:var(--green);font-weight:700}.pill{padding:4px 8px;border-radius:20px;background:#123a30;color:var(--green);font-size:12px}.warn{color:var(--amber)}
+button{background:#1b2b42;color:var(--text);border:1px solid var(--line);padding:9px 12px;border-radius:9px}
+@media(max-width:600px){.stats{grid-template-columns:1fr 1fr}h1{font-size:21px}}
+</style></head><body><main>
+<header><div><div class="muted">DAILY SECTOR ROTATION SCREENER</div><h1>Nifty Momentum Monitor</h1><div class="muted" id="date">Loading market data…</div></div><button onclick="load()">Refresh</button></header>
+<div class="stats"><div class="stat"><span class="muted">Indices covered</span><b id="covered">—</b></div><div class="stat"><span class="muted">Shortlisted</span><b id="count">—</b></div><div class="stat"><span class="muted">Best momentum</span><b id="best">—</b></div></div>
+<section class="panel"><h2>Shortlist · within 10% of ATH</h2><div class="muted">Requires momentum ≥80 and price above both 50 DMA and 200 DMA.</div><div class="tablewrap"><table><thead><tr><th>Sector</th><th>ATH distance</th><th>Momentum</th><th>RSI</th><th>Current</th><th>ATH</th><th>Trend</th><th>NSE check</th></tr></thead><tbody id="short"></tbody></table></div></section>
+<section class="panel"><h2>All covered indices</h2><div class="tablewrap"><table><thead><tr><th>Sector</th><th>ATH distance</th><th>Momentum</th><th>1M</th><th>3M</th><th>6M</th><th>12M</th><th>RSI</th><th>50 DMA</th><th>200 DMA</th></tr></thead><tbody id="all"></tbody></table></div></section>
+<section class="panel"><h3>Data quality</h3><div id="quality" class="muted">—</div><p class="muted">Scores are calculated from official historical index closes. Rankings are cross-sectional and are not investment advice.</p></section>
+</main><script>
+const n=(v,d=2)=>v==null?"—":Number(v).toFixed(d), row=x=>`<tr><td>${x.index}</td><td>${n(x.distance_from_ath_pct)}%</td><td class="score">${n(x.momentum_score,1)}</td><td>${n(x.rsi_14,1)}</td><td>${n(x.current)}</td><td>${n(x.ath)}</td><td>${x.above_50dma&&x.above_200dma?"Confirmed":"Not confirmed"}</td><td>${x.nse_check||"—"}</td></tr>`;
+async function load(){try{let r=await fetch("data/latest.json?ts="+Date.now());if(!r.ok)throw Error("No published data yet");let d=await r.json();document.getElementById("date").textContent="Market date: "+d.latest_market_date+" · Generated: "+d.generated_at_utc;
+document.getElementById("covered").textContent=d.success_count+"/"+d.universe_count;document.getElementById("count").textContent=d.shortlist.length;
+document.getElementById("best").textContent=d.results.length?d.results[0].momentum_score:"—";
+document.getElementById("short").innerHTML=d.shortlist.length?d.shortlist.map(row).join(""):'<tr><td colspan="7">No indices meet all filters today.</td></tr>';
+document.getElementById("all").innerHTML=d.results.map(x=>`<tr><td>${x.index}</td><td>${n(x.distance_from_ath_pct)}%</td><td class="score">${n(x.momentum_score,1)}</td><td>${n(x.return_1m_pct)}%</td><td>${n(x.return_3m_pct)}%</td><td>${n(x.return_6m_pct)}%</td><td>${n(x.return_12m_pct)}%</td><td>${n(x.rsi_14,1)}</td><td>${x.above_50dma?"Yes":"No"}</td><td>${x.above_200dma?"Yes":"No"}</td></tr>`).join("");
+document.getElementById("quality").innerHTML=`${d.source}<br>${d.success_count} of ${d.universe_count} configured indices loaded. ${d.errors.length?'<span class="warn">Some indices failed; ranking is partial.</span>':'All configured indices loaded.'} <br>${d.scoring_method}`;
+}catch(e){document.getElementById("quality").textContent=e.message;}}
+load();
+</script></body></html>
