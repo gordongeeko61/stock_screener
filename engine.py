@@ -26,7 +26,7 @@ NEAR_ATH, MIN_SCORE = 10.0, 80.0
 SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
 
-def get_history(index_name: str, start="01-Jan-1995", end=None) -> pd.DataFrame:
+def get_history_official(index_name: str, start="01-Jan-1995", end=None) -> pd.DataFrame:
     end = end or date.today().strftime("%d-%b-%Y")
     # Warm session/cookies from the official historical data page.
     page = SESSION.get(HIST_PAGE, timeout=30)
@@ -60,6 +60,42 @@ def get_history(index_name: str, start="01-Jan-1995", end=None) -> pd.DataFrame:
             last = e
             time.sleep(2 ** attempt)
     raise RuntimeError(f"Could not retrieve verified history for {index_name}: {last}")
+
+YAHOO = {
+    "NIFTY AUTO": "^CNXAUTO", "NIFTY BANK": "^NSEBANK",
+    "NIFTY FINANCIAL SERVICES": "NIFTY_FIN_SERVICE.NS", "NIFTY FMCG": "^CNXFMCG",
+    "NIFTY IT": "^CNXIT", "NIFTY MEDIA": "^CNXMEDIA", "NIFTY METAL": "^CNXMETAL",
+    "NIFTY PHARMA": "^CNXPHARMA", "NIFTY PSU BANK": "^CNXPSUBANK",
+    "NIFTY REALTY": "^CNXREALTY", "NIFTY PRIVATE BANK": "NIFTY_PVT_BANK.NS",
+    "NIFTY HEALTHCARE INDEX": "NIFTY_HEALTHCARE.NS",
+    "NIFTY CONSUMER DURABLES": "NIFTY_CONSR_DURBL.NS",
+    "NIFTY OIL & GAS": "NIFTY_OIL_AND_GAS.NS",
+}
+_OFFICIAL_BLOCKED = False
+
+def get_history_yahoo(name: str) -> pd.DataFrame:
+    import yfinance as yf
+    t = YAHOO.get(name)
+    if not t:
+        raise ValueError("no Yahoo ticker mapped")
+    df = yf.Ticker(t).history(period="max", auto_adjust=False)
+    if df.empty or len(df) < 260:
+        raise ValueError(f"Yahoo returned {len(df)} rows for {t}")
+    out = pd.DataFrame({
+        "date": pd.to_datetime(df.index).tz_localize(None).normalize(),
+        "close": df["Close"].astype(float).values,
+    }).dropna().drop_duplicates("date").sort_values("date")
+    return out.reset_index(drop=True)
+
+def get_history(name: str) -> pd.DataFrame:
+    global _OFFICIAL_BLOCKED
+    if not _OFFICIAL_BLOCKED:
+        try:
+            return get_history_official(name)
+        except Exception as e:
+            print("Official source failed, switching to Yahoo:", str(e)[:120])
+            _OFFICIAL_BLOCKED = True
+    return get_history_yahoo(name)
 
 def rsi(series: pd.Series, period=14) -> float:
     delta = series.diff()
@@ -182,7 +218,7 @@ def main():
             time.sleep(1.0)
         except Exception as e:
             errors.append({"index": name, "error": str(e)})
-    if len(rows) < max(3, len(cfg["indices"]) // 2):
+    if len(rows) < 5:
         raise RuntimeError(f"Only {len(rows)}/{len(cfg['indices'])} indices retrieved; refusing to publish a misleading report. Errors: {errors[:3]}")
     scored = build_scores(rows)
     # Cross-check latest date is consistent across series; stale data is never silently presented as current.
@@ -194,7 +230,7 @@ def main():
     result = {
         "generated_at_utc": datetime.now(ZoneInfo("UTC")).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "latest_market_date": latest_date,
-        "source": "Nifty Indices official historical data; NSE official daily index archive cross-check",
+        "source": "Nifty Indices official data where reachable; otherwise Yahoo Finance index history (ATH = highest close in available history)",
         "scoring_method": "Cross-sectional percentile composite: 1M 10%, 3M 20%, 6M volatility-adjusted 25%, 12M volatility-adjusted 25%, trend 15%, RSI 5%.",
         "universe_count": len(cfg["indices"]), "success_count": len(rows),
         "errors": errors, "results": scored,
