@@ -1,0 +1,55 @@
+name: Daily Nifty Momentum Screener
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 13 * * 1-5"
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  calculate-and-publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      REPORT_TO: ${{ secrets.REPORT_TO }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Calculate scores
+        run: python engine.py
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload dashboard
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - name: Deploy dashboard
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Send email report (skipped if secrets absent)
+        if: ${{ env.SMTP_HOST != '' && env.SMTP_USER != '' && env.SMTP_PASSWORD != '' && env.REPORT_TO != '' }}
+        continue-on-error: true
+        env:
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
+        run: python notify.py
+      - name: Commit history snapshot
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/data/history docs/data/latest.json
+          git diff --cached --quiet || (git commit -m "Daily data $(date -u +%F)" && git push)
